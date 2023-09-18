@@ -66,8 +66,21 @@ struct CPU
         return Data;
     }
 
+    Byte ReadByte(u32& cycles, Byte address, Mem& memory)
+    {
+        Byte Data = memory[address];
+        cycles--;
+        return Data;
+    }
+    
     // opcodes
-    static constexpr Byte INS_LDA_IM = 0xA9;
+    static constexpr Byte INS_LDA_IM = 0xA9, INS_LDA_ZP = 0xA5, INS_LDA_ZPX = 0xB5;
+
+    void LDASetStatus()
+    {
+        Z = (A == 0);
+        N = (A & 0b10000000) > 0;
+    }
 
     void Execute(u32 cycles, Mem& memory)
     {
@@ -80,8 +93,21 @@ struct CPU
             {
                 Byte Value = FetchByte(cycles, memory);
                 A = Value;
-                Z = (A == 0);
-                N = (A & 0b10000000) > 0;
+                LDASetStatus();
+            } break;
+            case INS_LDA_ZP:
+            {
+                Byte ZeroPageAddress = FetchByte(cycles, memory);
+                A = ReadByte(cycles, ZeroPageAddress, memory);
+                LDASetStatus();
+            } break;
+            case INS_LDA_ZPX:
+            {
+                Byte ZeroPageAddress = FetchByte(cycles, memory);
+                ZeroPageAddress += X;
+                cycles--;
+                A = ReadByte(cycles, ZeroPageAddress, memory);
+                LDASetStatus();
             } break;
             default:
             {
@@ -98,10 +124,11 @@ int main()
     CPU cpu;
     cpu.Reset(mem);
     //
-    mem[0xFFFC] = CPU::INS_LDA_IM;
+    mem[0xFFFC] = CPU::INS_LDA_ZP;
     mem[0xFFFD] = 0x42;
+    mem[0x0042] = 0x84;
     //
-    cpu.Execute(2, mem);
+    cpu.Execute(3, mem);
 
     return 0;
 }
